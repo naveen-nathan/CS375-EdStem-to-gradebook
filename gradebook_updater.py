@@ -12,7 +12,8 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-SPREADSHEET_ID = "1KSk6ZE21Uc3Lc5mTqD-nbrTrYRHaaZaV3BmYsbMK-Fw"
+SELF_REFLECTION_GRADEBOOK_ID = "1KSk6ZE21Uc3Lc5mTqD-nbrTrYRHaaZaV3BmYsbMK-Fw"
+ATTENDENCE_SID = '1DyGpBhvpswW2YowTvfSWtXFQTXTOij6AOwq5d5rrVAY'
 GRADEBOOK_SUBSHEET_NAME = "Grades With Only Self-Reflections"
 ATTENDENCE_SUBSHEET_NAME = "Script_Edited_Attendance"
 
@@ -69,7 +70,7 @@ def generate_full_name_column(creds):
     sheet = service.spreadsheets()
     result = (
         sheet.values()
-        .get(spreadsheetId=SPREADSHEET_ID, range=GRADEBOOK_SUBSHEET_NAME)
+        .get(spreadsheetId=SELF_REFLECTION_GRADEBOOK_ID, range=GRADEBOOK_SUBSHEET_NAME)
         .execute()
     )
     first_and_last_names = result.get("values", [])
@@ -93,22 +94,19 @@ def generate_full_name_column(creds):
     }
     """
 
-    request = service.spreadsheets().values().append(spreadsheetId=SPREADSHEET_ID,
-        range='C3:C',
-        body={
+    request = service.spreadsheets().values().append(spreadsheetId=SELF_REFLECTION_GRADEBOOK_ID,
+                                                     range='C3:C',
+                                                     body={
             "majorDimension": "COLUMNS",
             "values": [combined_names]
         },
-        valueInputOption="USER_ENTERED"
-    )
+                                                     valueInputOption="USER_ENTERED"
+                                                     )
 
 
 
     print(request.execute())
 
-    #print([combined_names])
-
-    #request = service.spreadsheets().batchUpdate(spreadsheetId=SPREADSHEET_ID, body=body)
 
 
 
@@ -207,7 +205,7 @@ def convert_date_to_day(date):
 def initialize(sheet, names_to_index, dates_to_index):
     
     result = (sheet.values().get(
-    spreadsheetId=SPREADSHEET_ID, 
+    spreadsheetId=SELF_REFLECTION_GRADEBOOK_ID,
     range=f'{GRADEBOOK_SUBSHEET_NAME}!C3:D38').execute()
     )
     names_and_dates = result.get("values", [])
@@ -231,12 +229,11 @@ def initialize(sheet, names_to_index, dates_to_index):
             for date_index in date_index_list:               
                 notation = f"{GRADEBOOK_SUBSHEET_NAME}!R" + str(names_to_index[name]) + "C" + str(date_index)
                 update_list.append({'range': notation, 'values': [['No']]})
-    #print(update_list)
-    update_sheet(sheet, update_list, SPREADSHEET_ID)
+    update_sheet(sheet, update_list, SELF_REFLECTION_GRADEBOOK_ID)
     
        
 
-def main(task):
+def perform_specified_task(task):
     creds = allow_user_to_authenticate_google_account()
     threads = retrieve_all_threads_from_Ed()
     # Retrieve dates row from sheet
@@ -249,8 +246,8 @@ def main(task):
     sheet = service.spreadsheets()
 
 
-    names_to_index = retrieve_names_to_index_mapping(sheet, SPREADSHEET_ID)
-    dates_to_index = retrieve_dates_to_index_mapping(sheet, SPREADSHEET_ID)
+    names_to_index = retrieve_names_to_index_mapping(sheet, SELF_REFLECTION_GRADEBOOK_ID)
+    dates_to_index = retrieve_dates_to_index_mapping(sheet, SELF_REFLECTION_GRADEBOOK_ID)
     update_list = []
     if task == "Self Reflections":
         for thread in threads:
@@ -258,7 +255,7 @@ def main(task):
                 notation = return_notation(thread, names_to_index, dates_to_index)
                 update_list.append({'range': notation, 'values': [['Yes']]})
         
-        update_sheet(sheet, update_list, SPREADSHEET_ID)
+        update_sheet(sheet, update_list, SELF_REFLECTION_GRADEBOOK_ID)
     elif task == "Lecture Makeups":
         for thread in threads:
             if thread['category'] == "Self Reflections":
@@ -267,10 +264,7 @@ def main(task):
     elif task == "Initialize":
        initialize(sheet, names_to_index, dates_to_index)
     elif task == "Attendence":
-        pass
-
-ATTENDENCE_SID = '1DyGpBhvpswW2YowTvfSWtXFQTXTOij6AOwq5d5rrVAY'
-
+        attendence()
        
 def attendence():
    service = build("sheets", "v4", credentials=allow_user_to_authenticate_google_account())
@@ -284,12 +278,9 @@ def attendence():
       if thread['category'] == "Lecture makeup":
             notation = return_notation(thread, names_to_index, dates_to_index, sheet_name=ATTENDENCE_SUBSHEET_NAME)
             update_list.append({'range': notation, 'values': [['TRUE']]})
-   #print(update_list)
    update_sheet(sheet, update_list, ATTENDENCE_SID)
 
-#main("Initialize")
-#main("Self Reflections")
-#attendence()
+
 def surveys():
    service = build("sheets", "v4", credentials=allow_user_to_authenticate_google_account())
    sheet = service.spreadsheets()
@@ -301,12 +292,10 @@ def surveys():
       if thread['category'] == "Survey":
             if thread['user']['name'] in names:
                 names.remove(thread['user']['name'])
-   print(names)
-   
-   #print(update_list)
-#update_sheet(sheet, update_list, ATTENDENCE_SID)
 
-#main("Initialize")
-main("Self Reflections")
-attendence()
 
+def main():
+    perform_specified_task("Self Reflections")
+    attendence()
+
+main()
